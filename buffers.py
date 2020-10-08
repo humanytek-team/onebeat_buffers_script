@@ -37,7 +37,7 @@ def load_data(path: str, filter_dict: dict = {}) -> list:
         return list(pure_data)
 
 
-def get_greatest(data, window) -> int:
+def get_greatest(data: [], window: int) -> int:
     sum = 0
     greatest = 0
     for i in range(len(data)):
