@@ -35,12 +35,10 @@ def main():
     skus_path = sys.argv[1]
     data_path = sys.argv[2]
     skus = load_skus(skus_path)
-    data = load_data(data_path)
-    update_skus(skus, data)
-    del data
+    load_data(skus, data_path)
     order_transactions(skus)
     greatest = get_greatest(skus)
-    print(greatest)
+    show(greatest)
     return greatest
 
 
@@ -55,26 +53,21 @@ def load_skus(path: str):
         return skus
 
 
-def load_data(path: str) -> list:
+def load_data(skus: dict, path: str):
     with open(path, 'r') as f:
         reader = csv.reader(f, delimiter=';')
         next(reader)
-        data = [[r[1], r[4], f'{r[5]}-{r[6]}-{r[7]}'] for r in reader if r[3] == 'OUT']
-        return data
-
-
-def update_skus(skus: dict, data: list) -> None:
-    for transaction in data:
-        try:
-            skus[transaction[0]]['transactions'].append((transaction[2], transaction[1]))
-        except:
-            pass  # TODO missing SKU
+        for r in reader:
+            if r[3] == 'OUT':
+                try:
+                    skus[r[1]]['transactions'].append((f'{r[5]}-{r[6]}-{r[7]}', float(r[4])))
+                except:
+                    pass
 
 
 def order_transactions(skus: dict) -> None:
-    for sku, v in skus.items():
+    for v in skus.values():
         v['transactions'].sort()
-        v['transactions'] = [float(t[1]) for t in v['transactions']]
 
 
 def get_greatest(skus: dict) -> list:
@@ -89,10 +82,15 @@ def get_greatest_by_sku(transactions: list, window: int) -> float:
     greatest = 0
     for i in range(len(transactions)):
         if i >= window:
-            s -= transactions[i - window]
-        s += transactions[i]
+            s -= transactions[i - window][1]
+        s += transactions[i][1]
         greatest = max(s, greatest)
     return greatest
+
+
+def show(greatest: list) -> None:
+    for r in greatest:
+        print(f'{r[0]},{r[1]}')
 
 
 if __name__ == '__main__':
