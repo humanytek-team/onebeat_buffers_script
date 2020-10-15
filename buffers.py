@@ -2,49 +2,96 @@
 import sys
 import csv
 
+# MTSKUS
+# 0  - Stock Location Name
+# 1  - Origin SL
+# 2  - SKU Name
+# 3  - SKU Description
+# 4  - Buffer Size
+# 5  - Replenishment Time
+# 6  - Inventory at Site
+# 7  - Inventory at Transit
+# 8  - Inventory at Production
+# 9  - Precio unitario
+# 10 - TVC
+# 11 - Throughput
+# 12 - Unidad de Medida
+# 13 - Reported Year
+# 14 - Reported Month
+# 15 - Reported Day
+
+# Transactions
+# 0  - Origin
+# 1  - SKU Name
+# 2  - Destination
+# 3  - Transaction Type (in/out)
+# 4  - Quantity
+# 5  - Shipping Year
+# 6  - Shipping Month
+# 7  - Shipping Day
+
 
 def main():
-    data_path = sys.argv[1]
-    sku = sys.argv[2]
-    replenishment_time_days = int(float(sys.argv[3]))
-    data = load_data(data_path, {
-        'SKU Name': sku,
-        'Transaction Type (in/out)': 'OUT',
-    })
-    greatest = get_greatest(data, replenishment_time_days)
+    skus_path = sys.argv[1]
+    data_path = sys.argv[2]
+    skus = load_skus(skus_path)
+    data = load_data(data_path)
+    update_skus(skus, data)
+    del data
+    order_transactions(skus)
+    greatest = get_greatest(skus)
     print(greatest)
     return greatest
 
 
-def load_data(path: str, filter_dict: dict = {}) -> list:
+def load_skus(path: str):
     with open(path, 'r') as f:
         reader = csv.reader(f, delimiter=';')
-        header = next(reader)
-        filter_list = [filter_dict.get(h, None) for h in header]
-
-        def filter_function(row: []) -> bool:
-            for t in zip(filter_list, row):
-                if t[0] != None and t[0] != t[1]:
-                    break
-            else:
-                return True
-            return False
-
-        data = filter(filter_function, reader)
-        clean_data = map(lambda r: [f'{r[5]}-{r[6]}-{r[7]}', int(float(r[4]))], data)
-        sorted_data = sorted(clean_data)
-        pure_data = map(lambda r: r[1], sorted_data)
-        return list(pure_data)
+        next(reader)
+        skus = {r[2]: {
+            'window': int(float(r[5])),
+            'transactions': [],
+        } for r in reader}
+        return skus
 
 
-def get_greatest(data: [], window: int) -> int:
-    sum = 0
+def load_data(path: str) -> list:
+    with open(path, 'r') as f:
+        reader = csv.reader(f, delimiter=';')
+        next(reader)
+        data = [[r[1], r[4], f'{r[5]}-{r[6]}-{r[7]}'] for r in reader if r[3] == 'OUT']
+        return data
+
+
+def update_skus(skus: dict, data: list) -> None:
+    for transaction in data:
+        try:
+            skus[transaction[0]]['transactions'].append((transaction[2], transaction[1]))
+        except:
+            pass  # TODO missing SKU
+
+
+def order_transactions(skus: dict) -> None:
+    for sku, v in skus.items():
+        v['transactions'].sort()
+        v['transactions'] = [float(t[1]) for t in v['transactions']]
+
+
+def get_greatest(skus: dict) -> list:
+    return [
+        (sku, get_greatest_by_sku(v['transactions'], v['window']))
+        for sku, v in skus.items()
+    ]
+
+
+def get_greatest_by_sku(transactions: list, window: int) -> float:
+    s = 0
     greatest = 0
-    for i in range(len(data)):
+    for i in range(len(transactions)):
         if i >= window:
-            sum -= data[i - window]
-        sum += data[i]
-        greatest = max(sum, greatest)
+            s -= transactions[i - window]
+        s += transactions[i]
+        greatest = max(s, greatest)
     return greatest
 
 
